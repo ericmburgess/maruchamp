@@ -23,8 +23,8 @@ class RamenBot(BaseAgent):
         self.last_game_time = 0
         self.tick_rate = 120
         self.last_frame_was_bad = False
-        self.stat_tick_ms = TickStats("tick", "ms", interval=100, startup=300)
-        self.stat_bad_frames = TickStats("bad frames", "%", interval=100, startup=300)
+        self.stat_tick_ms = TickStats("tick", "ms", interval=1000, startup=300)
+        self.stat_bad_frames = TickStats("bad frames", "%", interval=1000, startup=300)
 
     def _on_first_tick(self):
         """First-tick setup."""

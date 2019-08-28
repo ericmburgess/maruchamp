@@ -1,5 +1,14 @@
 """vitamins.util -- utility routines."""
 from time import perf_counter
+from platform import node
+from hashlib import md5
+
+
+def at_home():
+    """Return True in my home dev environment, False everywhere else."""
+    return md5(node().encode("utf-8")).hexdigest() in [
+        "98718bd98a3e2a41f760bc8f28810190"
+    ]
 
 
 def dev_print(*args, **kwargs):
