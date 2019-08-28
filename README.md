@@ -1,5 +1,6 @@
 # maruchamp
 ![GitHub](https://img.shields.io/github/license/ericmburgess/maruchamp)
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/ericmburgess/maruchamp)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
 ![GitHub issues](https://img.shields.io/github/issues/ericmburgess/maruchamp)
 ![GitHub last commit](https://img.shields.io/github/last-commit/ericmburgess/maruchamp)
