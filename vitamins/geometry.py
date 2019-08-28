@@ -10,10 +10,9 @@ class Vec3:
     """
 
     def __init__(self, x: object = 0, y: object = 0, z: object = 0) -> object:
-        """
-        Create a new Vec3. The x component can alternatively be another vector with an
-        x, y, and z component, in which case the created vector is a copy of the given
-        vector and the y and z parameter is ignored. Examples:
+        """ Create a new Vec3. The x component can alternatively be another vector with
+        an x, y, and z component, in which case the created vector is a copy of the
+        given vector and the y and z parameter is ignored. Examples:
 
         a = Vec3(1, 2, 3)
 
@@ -65,6 +64,9 @@ class Vec3:
         """Returns the length of the vector. Also called magnitude and norm."""
         return math.sqrt(self.x ** 2 + self.y ** 2 + self.z ** 2)
 
+    def to(self, other: "Vec3") -> "Vec3":
+        return other - self
+
     def dist(self, other: "Vec3") -> float:
         """Returns the distance between this vector and another vector using pythagoras.
         """
@@ -109,6 +111,18 @@ class Vec3:
         perp = self - proj
         return proj, perp
 
+    def lerp(self, other: "Vec3", t: float) -> "Vec3":
+        """Linearly interpolate beween self and `other`."""
+        return self + t * (self.to(other))
+
+    def midpoint(self, other: "Vec3") -> "Vec3":
+        return self.lerp(other, 1 / 2)
+
+    def nearest(self, *others: "Vec3", n=1):
+        """Return the 'n' nearest vectors from `others`."""
+        dists = [(self.dist(v), v) for v in others]
+        return [pair[1] for pair in sorted(dists)[:n]]
+
 
 class Orientation:
     """
@@ -118,9 +132,12 @@ class Orientation:
     """
 
     def __init__(self, rotation):
-        self.yaw = float(rotation.yaw)
-        self.roll = float(rotation.roll)
-        self.pitch = float(rotation.pitch)
+        if isinstance(rotation, Vec3):
+            self.yaw, self.roll, self.pitch = rotation
+        else:
+            self.yaw = float(rotation.yaw)
+            self.roll = float(rotation.roll)
+            self.pitch = float(rotation.pitch)
 
         cr = math.cos(self.roll)
         sr = math.sin(self.roll)
@@ -132,23 +149,6 @@ class Orientation:
         self.forward = Vec3(cp * cy, cp * sy, sp)
         self.right = Vec3(cy * sp * sr - cr * sy, sy * sp * sr + cr * cy, -cp * sr)
         self.up = Vec3(-cr * cy * sp - sr * sy, -cr * sy * sp + sr * cy, cp * cr)
-
-
-# Sometimes things are easier, when everything is seen from your point of view.
-# This function lets you make any location the center of the world.
-# For example, set center to your car's location and ori to your car's orientation, then
-# the target will be relative to your car!
-def relative_location(center: Vec3, ori: Orientation, target: Vec3) -> Vec3:
-    """Returns target as a relative location from center's point of view, using the
-    given orientation. The components of the returned vector describes:
-        x: how far in front
-        y: how far right
-        z: how far above
-    """
-    x = (target - center).dot(ori.forward)
-    y = (target - center).dot(ori.right)
-    z = (target - center).dot(ori.up)
-    return Vec3(x, y, z)
 
 
 def find_correction(current: Vec3, ideal: Vec3) -> float:

@@ -47,11 +47,11 @@ class BallChase(Activity):
             future_ball = ball
             self.dt = 1
         else:
-            z = future_ball.loc.z - future_ball.radius
+            z = future_ball.z - future_ball.radius
             if z > 20:
                 tjump = z / 300
                 if tjump < 1:
-                    if (car.loc + self.dt * car.vel).dist(future_ball.loc) < 300:
+                    if (car + self.dt * car.vel).dist(future_ball) < 300:
                         self.bot.con.jump = self.dt < tjump
         rel_spd = car.spd_to(future_ball)
         if rel_spd > 0:
@@ -59,12 +59,11 @@ class BallChase(Activity):
             # ball = ball.future(min(self.dt, 3) * 1.2)
         self.bot.con.throttle = 1
         offset = (
-            copysign(1, future_ball.loc.dot(self.bot.field.right))
-            * self.bot.field.right
+            copysign(1, future_ball.dot(self.bot.field.right)) * self.bot.field.right
         ) * self.bot.field.right
-        if future_ball.loc.dot(self.bot.field.fwd) < 0:
+        if future_ball.dot(self.bot.field.fwd) < 0:
             offset = -offset
-        target_loc = future_ball.loc + offset * ball.radius
+        target_loc = future_ball + offset * ball.radius
         pow = False
         if car.yaw_to(target_loc) < 0.2 and car.dist(target_loc) < 300:
             pow = ball.is_rolling()
@@ -86,7 +85,7 @@ class DriveToLocation(Activity):
     def step_0(self):
         car = self.bot.car
         self.bot.con.throttle = 1
-        control.turn_toward(self.bot, self.target.loc)
+        control.turn_toward(self.bot, self.target)
         self.bot.con.boost = self.use_boost and self.bot.car.spd < 1800
         self.status = f"{car.dist(self.target):.0f}"
         if car.dist(self.target) < 500:

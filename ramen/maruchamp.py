@@ -11,15 +11,16 @@ from ramen.veggies import kickoff, misc
 from ramen import control
 
 
-COMP_MODE = True  # True for competition mode
+COMP_MODE = False  # True for competition mode
 print = vitamins.util.comp_print if COMP_MODE else vitamins.util.dev_print
 
 
 class MaruChamp(RamenBot):
-    comp_mode = COMP_MODE
-
     def is_hot_reload_enabled(self):
-        return True
+        if COMP_MODE:
+            return False
+        else:
+            return True
 
     def on_start(self):
         self.state = "soccar"
@@ -37,7 +38,7 @@ class MaruChamp(RamenBot):
     def level_out(self):
         car = self.car
         field = self.field
-        if car.loc.z > 100 and not car.wheel_contact:
+        if car.z > 100 and not car.wheel_contact:
             if car.up.dot(field.up) > 0.95:
                 # Don't worry about it.
                 self.con.roll = 0
@@ -64,7 +65,7 @@ class MaruChamp(RamenBot):
             self.level_out_rolldir = None
 
     def driving_on_wall(self):
-        return self.car.loc.z > 100 and self.car.wheel_contact
+        return self.car.z > 100 and self.car.wheel_contact
 
     def attack_pos(self, dist=500):
         field, ball, car = self.field, self.ball, self.car
@@ -74,21 +75,21 @@ class MaruChamp(RamenBot):
             else:
                 target = self.field.opp_left_post
         else:
-            if self.ball.loc.dot(self.field.right) > 0:
+            if self.ball.dot(self.field.right) > 0:
                 target = self.field.opp_right_post
             else:
                 target = self.field.opp_left_post
-        draw.cross(target.loc, color="lime")
+        draw.cross(target, color="lime")
         dt = self.car.time_to(self.ball)
         fball = ball.future(dt) or ball
-        return (fball.loc + target.to(self.ball).rescale(dist)).flat()
+        return (fball + target.to(self.ball).rescale(dist)).flat()
 
     def defend_pos(self):
         dt = self.car.time_to(self.ball)
         loc = self.field.own_goal_center.midpoint(self.ball).flat()
         d = self.ball.dist(loc)
         if d > 3000:
-            loc = self.ball.loc + self.ball.to(self.field.own_goal_center).rescale(3000)
+            loc = self.ball + self.ball.to(self.field.own_goal_center).rescale(3000)
         return loc.flat()
 
     def hang_back_pos(self):
@@ -188,8 +189,9 @@ class MaruChamp(RamenBot):
                 self.state = "strike ball"
             if time_adv < -3:
                 self.state = "start defending"
-            if ball.future(2).dist_to_corner() < 1500:
-                if ball.loc.dot(field.fwd) > 1:
+            b = ball.future(2)
+            if b is not None and b.dist_to_corner() < 1500:
+                if ball.dot(field.fwd) > 1:
                     self.state = "hang back"
 
         elif self.state == "start defending":

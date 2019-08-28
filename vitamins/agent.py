@@ -3,9 +3,11 @@ from time import perf_counter_ns
 
 from rlbot.agents.base_agent import BaseAgent, SimpleControllerState
 from rlbot.utils.structures.game_data_struct import GameTickPacket
+from rlbot.utils.rendering.rendering_manager import DummyRenderer
 
 from vitamins.game import TheBall, Car, Field
 from vitamins import draw
+from vitamins.util import TickStats
 
 
 class RamenBot(BaseAgent):
@@ -20,7 +22,9 @@ class RamenBot(BaseAgent):
         self.on_start()
         self.last_game_time = 0
         self.tick_rate = 120
-        self.bad_frame = False  # True when delta time is wrong (e.g. skipped frame)
+        self.last_frame_was_bad = False
+        self.stat_tick_ms = TickStats("tick", "ms", interval=100, startup=300)
+        self.stat_bad_frames = TickStats("bad frames", "%", interval=100, startup=300)
 
     def _on_first_tick(self):
         """First-tick setup."""
@@ -32,6 +36,8 @@ class RamenBot(BaseAgent):
         self.ball = TheBall(self)
         self.ball.update()
         self.team = self.packet.game_cars[self.index].team
+        self._renderer = self.renderer
+        # self.renderer = DummyRenderer(self.renderer)
         self.on_first_tick()
 
     def _on_tick(self):
@@ -57,7 +63,6 @@ class RamenBot(BaseAgent):
         self.last_game_time = self.game_time
         self.game_time = packet.game_info.seconds_elapsed
         self.dt = self.game_time - self.last_game_time
-        # self.bad_frame = abs(self.dt - 1 / self.tick_rate) > 2e-3
         self.packet = packet
         self.renderer.begin_rendering()
 
@@ -68,6 +73,9 @@ class RamenBot(BaseAgent):
 
         self.tick += 1
         self.renderer.end_rendering()
+        tick_ms = (perf_counter_ns() - self.tick_start) / 1e6
+        self.stat_tick_ms.update(tick_ms)
+        self.stat_bad_frames.update(100 if self.last_frame_was_bad else 0)
         return self.con
 
     def tick_ms(self):

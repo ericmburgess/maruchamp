@@ -6,7 +6,7 @@ from ramen import control
 class DumbKickoff(Activity):
     def step_0(self):
         self.bot.con.throttle = 1
-        control.turn_toward(self.bot, self.bot.ball.loc)
+        control.turn_toward(self.bot, self.bot.ball)
         self.bot.con.boost = self.bot.car.spd < 2300
         if self.bot.ball.spd > 50:
             self.done = True
@@ -15,7 +15,7 @@ class DumbKickoff(Activity):
 class JumpKickoff(Activity):
     def step_0(self):
         self.bot.con.throttle = 1
-        control.turn_toward(self.bot, self.bot.ball.loc)
+        control.turn_toward(self.bot, self.bot.ball)
         self.bot.con.boost = self.bot.car.spd < 2300
         if self.bot.car.dist(self.bot.ball) < 400:
             self.bot.con.jump = True
@@ -28,7 +28,7 @@ class FlipKickoff(Activity):
     def step_0(self):
         self.bot.con.throttle = 1
         self.bot.con.boost = True
-        control.turn_toward(self.bot, self.bot.ball.loc)
+        control.turn_toward(self.bot, self.bot.ball)
         self.status = f"{self.bot.car.yaw_to(self.bot.ball):.2f}"
         if self.bot.car.yaw_to(self.bot.ball) < 0.01:
             self.bot.con.steer = 0
@@ -58,6 +58,6 @@ class FlipKickoff(Activity):
             self.next_step()
 
     def step_4(self):
-        control.turn_toward(self.bot, self.bot.ball.loc)
+        control.turn_toward(self.bot, self.bot.ball)
         if self.bot.ball.spd > 50:
             self.done = True

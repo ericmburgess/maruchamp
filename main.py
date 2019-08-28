@@ -1,5 +1,5 @@
-from ramen.maruchamp import MaruChamp
+from ramen.maruchamp import MaruChamp as Bot
 
 
-class Agent(MaruChamp):
+class Agent(Bot):
     pass
