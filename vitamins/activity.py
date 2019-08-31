@@ -1,4 +1,4 @@
-"""activityx.py -- Class to encapsulate activities or intentions."""
+"""activity.py -- Class to encapsulate activities or intentions."""
 
 from vitamins.agent import RamenBot
 
@@ -13,6 +13,7 @@ class Activity:
         self.done = False
         self.result = None
         self.countdown = 0
+        self.wake_time = 0
         self.next_step(0)
         self.status = ""
 
@@ -28,12 +29,17 @@ class Activity:
             raise ActivityDone()
         if self.countdown:
             self.countdown -= 1
-        else:
-            self.stepfunc()
+            return
+        if self.bot.game_time < self.wake_time:
+            return
+        self.stepfunc()
 
-    def next_step(self, step_num=None, sleep=0):
+    def next_step(self, step_num=None, ticks=0, ms=0):
         self.step = self.step + 1 if step_num is None else step_num
-        self.countdown = max(self.countdown, sleep)
+        self.countdown = max(self.countdown, ticks)
+        if ms > 0:
+            self.countdown = 0
+            self.wake_time = self.bot.game_time + ms / 1e3
         try:
             funcname = f"step_{self.step}"
             self.stepfunc = getattr(self, funcname)
@@ -47,11 +53,11 @@ class Activity:
         self.countdown = max(self.countdown, ticks)
 
     def ticks(self):
-        """Return the number of ticks since the activityx started."""
+        """Return the number of ticks since the activity started."""
         return self.bot.tick - self.start_ticks
 
     def game_time(self):
-        """Return the number of in-game seconds since the activityx started."""
+        """Return the number of in-game seconds since the activity started."""
         return self.bot.game_time - self.start_time
 
     def step_ticks(self):

@@ -1,4 +1,5 @@
 """game.py -- Classes to represent and manipulate game objects."""
+from functools import partial
 
 from rlbot.utils.structures.game_data_struct import FieldInfoPacket, GameTickPacket
 from rlbot.utils.game_state_util import (
@@ -10,10 +11,34 @@ from rlbot.utils.game_state_util import (
     Rotator,
 )
 
-from vitamins.geometry import Orientation, Vec3
+from vitamins.geometry import Orientation, Vec3, Line
 from vitamins import draw
 from vitamins import math
 from vitamins.util import *
+
+
+class Line:
+    """Represents a 2D line on the ground level of the field."""
+
+    def __init__(self, pos: Vec3, dir: Vec3):
+        self.pos = pos.flat()
+        self.dir = dir.flat().normalized()
+
+    def draw(self, color: str = ""):
+        bumps = 5
+        bump_spd = 1410
+        length = 20000
+        height = Vec3(z=20)
+        start = self.pos - self.dir * length / 2 + height
+        end = self.pos + self.dir * length / 2 + height
+        draw.line_3d(start, end, color)
+        for i in range(bumps):
+            t = length / bumps
+            draw.point(start + t * self.dir + height)
+
+    def offset(self, loc: Vec3):
+        """Returns the shortest vector from `loc` to a point on the Line."""
+        _, perp = loc.to(self.pos).decompose(self.dir)
 
 
 class Location(Vec3):
@@ -54,13 +79,16 @@ class PhysicalObject(Location):
             orientation = Orientation(Vec3())
         self.ort = orientation
 
-    def rel_vel(self, other) -> Vec3:
+    def rel_vel(self, other: Vec3) -> Vec3:
         """Relative velocity."""
-        return other.vel - self.vel
+        try:
+            return self.vel - other.vel
+        except AttributeError:
+            return self.vel
 
     def spd_to(self, other) -> float:
         """Closing speed (positive=approaching, negative=away)."""
-        return -self.rel_vel(other).dot(self.to(other).normalized())
+        return self.rel_vel(other).dot(self.to(other).normalized())
 
     def time_to(self, other) -> float:
         pass
@@ -69,11 +97,14 @@ class PhysicalObject(Location):
 class Car(PhysicalObject):
     """Convenient access to data about a car in game."""
 
+    box: "Hitbox"
+
     def __init__(self, index, packet=None):
         super().__init__()
         self.index = index
         if packet is not None:
             self.update(packet)
+        self.line = Line(Vec3(), Vec3(1, 0, 0))
 
     def update(self, packet):
         pcar = packet.game_cars[self.index]
@@ -100,6 +131,8 @@ class Car(PhysicalObject):
         self.demolished = pcar.is_demolished
         self.supersonic = pcar.is_super_sonic
         self.boost = pcar.boost
+        self.line.pos = self.position.flat()
+        self.line.dir = self.fwd.flat()
 
     def yaw_to(self, other):
         if hasattr(other, "loc"):
@@ -109,7 +142,7 @@ class Car(PhysicalObject):
         ovec = self.to(loc)
         ox = ovec.dot(self.right)
         oy = ovec.dot(self.fwd)
-        return math.atan2(-ox, oy)
+        return -math.atan2(-ox, oy)
 
     def time_to(self, target):
         """Rough estimate of how long it will take to reach `other`."""
@@ -127,11 +160,98 @@ class Car(PhysicalObject):
                 location=Vector3(x=self.x, y=self.y, z=self.z),
                 velocity=Vector3(x=self.vel.x, y=self.vel.y, z=self.vel.z),
                 angular_velocity=Vector3(x=self.avel.x, y=self.avel.y, z=self.avel.z),
-                rotation=self.rot,
+                rotation=Rotator(self.pitch, self.yaw, self.roll),
             )
         car_state = CarState(physics=phys)
         game_state = GameState(cars={bot.index: car_state})
         bot.set_game_state(game_state)
+
+    def reset_to_own_goal(self, bot):
+        self.position = (bot.field.own_goal_center + bot.field.fwd * 500).flat() + Vec3(
+            x=-500, z=100
+        )
+        self.yaw = -math.pi / 2 * Vec3(1, 0, 0).cross(bot.field.fwd).length()
+        self.pitch = self.roll = 0
+        self.vel = Vec3(0)
+        self.avel = Vec3(0)
+        self.reset(bot)
+
+
+class Hitbox:
+    # This is Octane, todo: add the others
+    width = 84.20
+    length = 118.01
+    height = 36.16
+    root_to_front = 72.88
+    root_to_top = 38.83
+    root_to_side = 42.10
+    root_to_back = 45.13
+
+    def __init__(self, car: Car):
+        self.car = car
+
+    @property
+    def _fwd(self):
+        return self.car.fwd * self.root_to_front
+
+    @property
+    def _back(self):
+        return self.car.back * self.root_to_back
+
+    @property
+    def _left(self):
+        return self.car.left * self.root_to_side
+
+    @property
+    def _up(self):
+        return self.car.up * self.root_to_top
+
+    @property
+    def _down(self):
+        return self.car.down * (self.height - self.root_to_top)
+
+    def location(self, corner_str: str, dt: float = 0):
+        """Returns a location on the hitbox, given a string of up to three characters:
+            FB: front/back
+            UD: up/down
+            LR: left/right
+        Examples:
+            FLU = forward left top corner
+            FU = center of the top front edge
+            U = center of the top face
+        Note: "Center" means aligned with the center of rotation. So e.g. RU is closer
+            to RUB than to RUF.
+        """
+        corner_str = corner_str.upper()
+        pos = self.car.position + dt * self.car.vel
+        if "F" in corner_str:
+            pos += self._fwd
+        if "B" in corner_str:
+            pos += self._back
+        if "L" in corner_str:
+            pos += self._left
+        if "R" in corner_str:
+            pos -= self._left
+        if "U" in corner_str:
+            pos += self._up
+        if "D" in corner_str:
+            pos += self._down
+        return pos
+
+    def draw(self, color: str = "", dt: float = 0):
+        c = partial(self.location, dt=dt)
+        draw.line_3d(c("blu"), c("flu"), color)
+        draw.line_3d(c("bru"), c("fru"), color)
+        draw.line_3d(c("bld"), c("fld"), color)
+        draw.line_3d(c("brd"), c("frd"), color)
+        draw.line_3d(c("flu"), c("fru"), color)
+        draw.line_3d(c("fld"), c("frd"), color)
+        draw.line_3d(c("blu"), c("bru"), color)
+        draw.line_3d(c("bld"), c("brd"), color)
+        draw.line_3d(c("fld"), c("flu"), color)
+        draw.line_3d(c("frd"), c("fru"), color)
+        draw.line_3d(c("bld"), c("blu"), color)
+        draw.line_3d(c("brd"), c("bru"), color)
 
 
 class Ball(PhysicalObject):
@@ -139,11 +259,12 @@ class Ball(PhysicalObject):
 
     radius = 92.75
 
-    def __init__(self, packet=None, phys=None):
+    def __init__(self, packet=None, phys=None, time=0):
         super().__init__()
-        self.vel = Vec3()
+        self.vel: Vec3 = Vec3()
         self.avel = Vec3()
         self.spd: float = 0
+        self.time = time
         self.update(packet, phys)
 
     def update(self, packet=None, phys=None):
@@ -177,7 +298,7 @@ class Ball(PhysicalObject):
 
 
 class TheBall(Ball):
-    """The one true ball (i.e. we can predict it)."""
+    """The one true ball (i.e. the one we get predictions for)."""
 
     coarse: int = 16
     max_bounces = 5
@@ -192,13 +313,14 @@ class TheBall(Ball):
         self.bot = bot
         self.bounces = []
         self.draw_path = True
+        self.draw_bounces = True
         self.draw_step = 8
         self.draw_bounces = True
         self.on_opp_goal = False  # on a path to score!
         self.on_own_goal = False  # on a path to score...
         self.time_to_goal = 0
         self.next_prediction_update = 0
-        self.prediction_interval = 1
+        self.prediction_interval = 1 / 2
         self.current_slice = 0
         self.prediction = None
         self.index_now = 0
@@ -208,7 +330,7 @@ class TheBall(Ball):
         super().update(packet=self.bot.packet)
         # self.refresh_prediction()
         self.update_prediction()
-        self.analyze_prediction()
+        self.analyze_prediction(max_ms=2)
         if self.draw_path:
             self.draw_prediction(step=self.draw_step)
 
@@ -218,8 +340,7 @@ class TheBall(Ball):
             return self
         t = self.bot.game_time + dt
         if (
-            getattr(self, "path", None) is None
-            or self.prediction.slices[0].game_seconds > t
+            self.prediction.slices[0].game_seconds > t
             or self.prediction.slices[self.prediction.num_slices - 1].game_seconds < t
         ):
             return None
@@ -230,7 +351,7 @@ class TheBall(Ball):
         while self.prediction.slices[index].game_seconds < t:
             index += 1
         phys = self.prediction.slices[index].physics
-        return Ball(phys=phys)
+        return Ball(phys=phys, time=self.prediction.slices[index].game_seconds)
 
     def update_prediction(self):
         if self.prediction is not None:
@@ -245,7 +366,7 @@ class TheBall(Ball):
                 self.next_prediction_update = self.bot.game_time
 
         if self.bot.game_time >= self.next_prediction_update:
-            self.next_prediction_update += self.prediction_interval
+            self.next_prediction_update = self.bot.game_time + self.prediction_interval
             self.prediction = self.bot.get_ball_prediction_struct()
             self.current_slice = 0
             self.index_now = 0
@@ -295,6 +416,39 @@ class TheBall(Ball):
             for i, dv in self.bounces:
                 draw.cross(self.prediction.slices[i].physics.location, color="red")
 
+    def score(self, bot, dir=None):
+        if dir is None:
+            dir = bot.field.fwd
+        self.vel = dir * 2300
+        self.position = bot.field.center + 5000 * dir + Vec3(z=500)
+        self.reset(bot)
+
+    def get_bounces(self) -> [Ball]:
+        bounces = []
+        for i, dv in self.bounces:
+            b = Ball(
+                phys=self.prediction.slices[i].physics,
+                time=self.prediction.slices[i].game_seconds,
+            )
+            b.dv = dv
+            bounces.append(b)
+        return bounces
+
+    def next_bounce(self, game_time: float, min_dv: float = 500) -> Ball:
+        """Return the first bounce after the specified game time."""
+        for i, dv in self.bounces:
+            if (
+                self.prediction.slices[i].game_seconds > game_time
+                and abs(dv.z) >= min_dv
+            ):
+                b = Ball(
+                    phys=self.prediction.slices[i].physics,
+                    time=self.prediction.slices[i].game_seconds,
+                )
+                b.dv = dv
+                return b
+        return None
+
 
 class BoostPickup(Location):
     """Boost pickup. Duh."""
@@ -309,6 +463,12 @@ class BoostPickup(Location):
 
 class Field:
     """Convenient access to data about the play field."""
+
+    to_side_wall = 4096
+    to_end_wall = 5120
+    to_ceiling = 2044
+    goal_height = 642.775
+    goal_width = 2 * 892.755
 
     def __init__(self, team: int, field_info_packet: FieldInfoPacket):
         self.center = Location(0, 0, 0)
@@ -369,6 +529,13 @@ class Field:
         for i in range(packet.num_boost):
             self.boosts[i].is_ready = packet.game_boosts[i].is_active
             self.boosts[i].timer = packet.game_boosts[i].timer
+
+    def is_near_wall(self, pos: Location, dist=500):
+        """Return True if the location is close to a wall."""
+        return (
+            abs(pos.x) + dist > self.to_side_wall
+            or abs(pos.y) + dist > self.to_end_wall
+        )
 
 
 def ball_is_rolling(phys) -> bool:
