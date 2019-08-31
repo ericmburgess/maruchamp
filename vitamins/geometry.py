@@ -29,7 +29,7 @@ class Vec3:
             self.y = float(y)
             self.z = float(z)
 
-    def __getitem__(self, item: int):
+    def __getitem__(self, item: int) -> float:
         return (self.x, self.y, self.z)[item]
 
     def __add__(self, other: "Vec3") -> "Vec3":
@@ -44,7 +44,7 @@ class Vec3:
     def __mul__(self, scale: float) -> "Vec3":
         return Vec3(self.x * scale, self.y * scale, self.z * scale)
 
-    def __rmul__(self, scale):
+    def __rmul__(self, scale: float) -> "Vec3":
         return self * scale
 
     def __truediv__(self, scale: float) -> "Vec3":
@@ -54,13 +54,16 @@ class Vec3:
     def __str__(self):
         return "Vec3(" + str(self.x) + ", " + str(self.y) + ", " + str(self.z) + ")"
 
-    def flat(self):
+    def __repr__(self):
+        return str(self)
+
+    def flat(self) -> "Vec3":
         """Returns a new Vec3 that equals this Vec3 but projected onto the ground plane.
         I.e. where z=0.
         """
         return Vec3(self.x, self.y, 0)
 
-    def length(self):
+    def length(self) -> float:
         """Returns the length of the vector. Also called magnitude and norm."""
         return math.sqrt(self.x ** 2 + self.y ** 2 + self.z ** 2)
 
@@ -72,9 +75,12 @@ class Vec3:
         """
         return (self - other).length()
 
-    def normalized(self):
+    def normalized(self) -> "Vec3":
         """Returns a vector with the same direction but a length of one."""
-        return self / self.length()
+        if self.length() == 0:
+            return Vec3(0, 0, 0)
+        else:
+            return self / self.length()
 
     def rescale(self, new_len: float) -> "Vec3":
         """Returns a vector with the same direction but a different length."""
@@ -101,18 +107,22 @@ class Vec3:
         cos_ang = self.dot(ideal) / (self.length() * ideal.length())
         return math.acos(cos_ang)
 
+    def yaw_to(self, other: "Vec3") -> float:
+        """Returns the signed angle to the other vector."""
+        return angle_diff(math.atan2(-self.x, self.y), math.atan2(-other.x, other.y))
+
     def proj(self, other: "Vec3") -> "Vec3":
         other_dir = other.normalized()
         return self.dot(other_dir) * other_dir
 
-    def decompose(self, other: "Vec3"):
+    def decompose(self, other: "Vec3") -> ("Vec3", "Vec3"):
         other_dir = other.normalized()
         proj = self.dot(other_dir) * other_dir
         perp = self - proj
         return proj, perp
 
     def lerp(self, other: "Vec3", t: float) -> "Vec3":
-        """Linearly interpolate beween self and `other`."""
+        """Linearly interpolate beween self (t=0) and `other` (t=1)."""
         return self + t * (self.to(other))
 
     def midpoint(self, other: "Vec3") -> "Vec3":
@@ -122,6 +132,12 @@ class Vec3:
         """Return the 'n' nearest vectors from `others`."""
         dists = [(self.dist(v), v) for v in others]
         return [pair[1] for pair in sorted(dists)[:n]]
+
+    def offline(self, other: "Vec3") -> float:
+        """Return the distance from `other` to the closest point on the line parallel
+        to `self`.
+        """
+        return (self - self.proj(other)).length()
 
 
 class Orientation:
@@ -175,3 +191,40 @@ def angle_diff(a1: float, a2: float) -> float:
         else:
             diff -= 2 * math.pi
     return diff
+
+
+class Line:
+    """Represents a 2D line on the ground level of the field."""
+
+    def __init__(self, pos: Vec3, dir: Vec3):
+        self.pos = pos.flat()
+        self.dir = dir.flat().normalized()
+
+    def offset(self, loc: Vec3) -> Vec3:
+        """Returns the shortest vector from `loc` to a point on the Line."""
+        _, perp = loc.flat().to(self.pos).decompose(self.dir)
+        return perp
+
+    def nearest_point(self, loc: Vec3) -> Vec3:
+        """Return the nearest point on this line to the given point."""
+        return loc + self.offset(loc)
+
+    def intersection(self, other: "Line") -> Vec3:
+        """Intersection of two Lines. Exists and is unique unless lines are parallel."""
+        if abs(self.dir.dot(other.dir)) > 0.99999:
+            return None
+        perp = self.offset(other.pos)
+        toward = other.dir.proj(perp)
+        plen = math.copysign(perp.length(), other.dir.dot(perp))
+        return other.pos + other.dir * plen / toward.length()
+
+    def intersection_length(self, other: "Line") -> float:
+        """Returns the length from this line's base point to its intersection with
+        `other`, in this line's direction (so it can be neagative).
+        """
+        if abs(self.dir.dot(other.dir)) > 0.99999:
+            return None
+        perp = other.offset(self.pos)
+        toward = self.dir.proj(perp)
+        plen = math.copysign(perp.length(), self.dir.dot(perp))
+        return plen / toward.length()

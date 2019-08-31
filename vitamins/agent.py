@@ -5,7 +5,7 @@ from rlbot.agents.base_agent import BaseAgent, SimpleControllerState
 from rlbot.utils.structures.game_data_struct import GameTickPacket
 from rlbot.utils.rendering.rendering_manager import DummyRenderer
 
-from vitamins.game import TheBall, Car, Field
+from vitamins.game import TheBall, Car, Hitbox, Field
 from vitamins import draw
 from vitamins.util import TickStats
 
@@ -21,17 +21,19 @@ class RamenBot(BaseAgent):
         self.game_time = 0
         self.on_start()
         self.last_game_time = 0
+        self.dt = 0
         self.tick_rate = 120
         self.last_frame_was_bad = False
-        self.stat_tick_ms = TickStats("tick", "ms", interval=1000, startup=300)
-        self.stat_bad_frames = TickStats("bad frames", "%", interval=1000, startup=300)
+        self.start_stats()
+        self.draw_hitbox = False
 
     def _on_first_tick(self):
         """First-tick setup."""
         self.field = Field(self.team, self.get_field_info())
-        self.opponent_index = 1 - self.index
         # Hacky; assumes 1v1:
+        self.opponent_index = 1 - self.index
         self.car = Car(self.index)
+        self.car.box = Hitbox(self.car)
         self.opponent_car = Car(self.opponent_index)
         self.ball = TheBall(self)
         self.ball.update()
@@ -46,6 +48,15 @@ class RamenBot(BaseAgent):
         self.field.update(self.packet)
         self.ball.update()
         self.on_tick()
+        if self.draw_hitbox:
+            self.car.box.draw("green", dt=2 * self.dt)
+
+    def start_stats(self):
+        interval = 1000
+        self.stat_tick_ms = TickStats("tick", "ms", interval=interval, startup=300)
+        self.stat_bad_frames = TickStats(
+            "bad frames", "%", interval=interval, startup=300
+        )
 
     def clear_controls(self):
         c = self.con
@@ -85,8 +96,9 @@ class RamenBot(BaseAgent):
     def on_first_tick(self):
         pass
 
-    def on_retire(self):
-        pass
+    def retire(self):
+        print("Retire signalled...")
+        self.start_stats()
 
     def on_start(self):
         pass
