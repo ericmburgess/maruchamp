@@ -17,6 +17,9 @@ My intent is that the `ramen` and `vitamins` packages should be useful for anyon
 
 ## A few notes for anyone checking out the code
 
+* The `ramen` and `vitamins` packages are intended to form a "bot making toolkit". Bot makers can import assets from
+them into their own code, as `maruchamp_main.py` and the `maruchamp` package do.
+* There are fairly good docstrings on most of the classes and methods in `ramen` and `vitamins`. Not so much `maruchamp`.
 * `vitamins.match.match.Match` (what a name) is a singleton (implemented as a class) which represents the current match.
 All the other match information is accessed through it, so any file that needs access to game information just needs
 to have `from vitamins.match.match import Match` at the top. I'm not yet settled on whether this is the best way to
