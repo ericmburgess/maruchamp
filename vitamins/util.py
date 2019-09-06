@@ -52,3 +52,4 @@ class TickStats:
             out += f"{self.total_interval/self.interval:.2f}{self.unit}"
             print(out)
             self.total_interval = 0
+
