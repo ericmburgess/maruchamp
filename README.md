@@ -9,7 +9,9 @@ MaruChamp Rocket League bot by Ramen and Vitamins
 
 Language: Python
 
-I've rewritten about 90% of Maru's code. This version is close to what I submitted for Season 1 weekend 1 (but a little worse because I'm in the middle of tweaking stuff). It uses a "utility AI" to choose what to do from moment to moment. 
+I've rewritten about 90% of Maru's code. This version is close to what I submitted for Season 1 weekend 1 (but a little worse because I'm in the middle of tweaking stuff). It uses a "utility AI" to choose what to do from moment to moment. This is a well-known approach to
+game AI and you can google lots of information on it. I think it has great potential for Rocket League AI, since the game situation is
+so fluid and continuous, rather than the kind of discrete states and actions that many other games have.
 
 My intent is that the `ramen` and `vitamins` packages should be useful for anyone else who wants to make a Python bot. Everything in there is general-purpose, and all the MaruChamp-specific stuff is under `maruchamp`. I'm working on documentation for `ramen` and `vitamins` and I'm planning to make a tutorial for using them to create a basic utility AI bot.
 
