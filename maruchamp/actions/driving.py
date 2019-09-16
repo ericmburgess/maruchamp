@@ -37,7 +37,7 @@ class DriveToLocation(Action):
     def step_0(self):
         # Decide if we want to reverse and half flip:
         if (
-            abs(Match.agent_car.yaw_to(self.target)) > 3 * math.pi / 4
+            abs(Match.agent_car.yaw_to(self.target)) > 7 * math.pi / 8
             and Match.agent_car.forward_speed < 200
         ):
             self.step(2)

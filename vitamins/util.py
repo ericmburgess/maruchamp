@@ -4,19 +4,20 @@ from platform import node
 from hashlib import md5
 
 
-def at_home():
+DEV_HOST_HASHES = ["98718bd98a3e2a41f760bc8f28810190"]
+
+
+def host_hash() -> str:
+    """Return the md5 hash of the current hostname. This allows you to write and
+    upload code that can run differently on your own computer (e.g. with more debug
+    output) than elsewhere, without having to reveal your computer's host name.
+    """
+    return md5(node().encode("utf-8")).hexdigest()
+
+
+def in_dev_environment():
     """Return True in my home dev environment, False everywhere else."""
-    return md5(node().encode("utf-8")).hexdigest() in [
-        "98718bd98a3e2a41f760bc8f28810190"
-    ]
-
-
-def dev_print(*args, **kwargs):
-    print(*args, **kwargs)
-
-
-def comp_print(*args, **kwargs):
-    pass
+    return host_hash() in DEV_HOST_HASHES
 
 
 def perf_counter_ns_for_36():
@@ -53,3 +54,10 @@ class TickStats:
             print(out)
             self.total_interval = 0
 
+
+if __name__ == "__main__":
+    print(f"Running in dev environment: {in_dev_environment()}")
+    print(
+        f"Current host hash: {host_hash()} (copy into DEV_HOST_HASHES "
+        "to add this host as a development environment.)"
+    )

@@ -1,7 +1,7 @@
 from typing import List
 
 from vitamins import math, draw
-from vitamins.geometry import Vec3
+from vitamins.geometry import Vec3, Line
 from vitamins.match.match import Match, Ball
 from vitamins.match.field import BoostPickup
 from vitamins.util import TickStats, perf_counter_ns
@@ -13,6 +13,7 @@ from ramen import control
 from maruchamp.actions.basic import KillAngularVelocity
 from maruchamp.actions import driving
 from maruchamp.tasks.kickoff import FlipAtBallKickoff
+from maruchamp.tasks import test
 from maruchamp import ideas, scores
 
 
@@ -68,7 +69,8 @@ class BlockBall(Task):
 
     @staticmethod
     def across_ball_from_opponent():
-        return Match.ball.flat().distance_toward(Match.opponent_car.flat(), -150)
+        # return Match.ball.flat().distance_toward(Match.opponent_car.flat(), -150)
+        return Match.ball.midpoint(Match.opponent_car).flat()
 
     def enter(self):
         self.do_action(driving.TrackLocation(self.across_ball_from_opponent))
@@ -108,11 +110,13 @@ class WheelsDownRoll(Task):
             self.to_roll = -1
 
     def run(self):
-        Match.agent.clear_controls()
-        Match.agent.roll(self.to_roll)
-        if Match.agent_car.down.dot(self.target_down) > self.target_dot:
-            self.do_action(KillAngularVelocity())
-            self.status = f"stop turning"
+        if Match.agent_car.right.dot(Match.field.up) > 0:
+            Match.agent.roll(1)
+        else:
+            Match.agent.roll(-1)
+        # if Match.agent_car.down.dot(self.target_down) > self.target_dot:
+        #     self.do_action(KillAngularVelocity())
+        #     self.status = f"stop turning"
 
 
 class NoseToFlatVelocity(Task):
@@ -300,9 +304,13 @@ class Reposition(Task):
         fball = Match.predict_ball(1)
         if fball.dot(Match.field.forward) > 0:
             self.status = "attack"
-            return fball.flat().distance_toward(
+            target = fball.flat().distance_toward(
                 Match.field.opp_goal_center.flat(), -600
             )
+            fwdness = target.dot(Match.field.forward)
+            if fwdness > 4000:
+                target.position -= (fwdness - 4000) * Match.field.forward
+            return target
         else:
             self.status = "defend"
             return fball.flat().distance_toward(Match.field.own_goal_center.flat(), 900)
@@ -463,16 +471,19 @@ class MaruChamp(TaskAgent):
         self.add_task(FlipAtBallKickoff())
         self.add_task(WheelsDownRoll(), 0.8)
         self.add_task(NoseToFlatVelocity())
-        self.add_task(PushBallToGoal())
-        self.add_task(BlockBall(), 0.8)
-        self.add_task(GetNearestBigBoost())
-        self.add_task(StraightShotRollingBall())
-        self.add_task(Reposition())
-        self.add_task(GitYeeted())
+        # self.add_task(PushBallToGoal())
+        # self.add_task(BlockBall(), 0.8)
+        # self.add_task(GetNearestBigBoost())
+        # self.add_task(StraightShotRollingBall())
+        # self.add_task(Reposition(), 1.0)
+        # self.add_task(GitYeeted())
         # self.add_task(BounceShot())
         # self.add_task(JustDrive(), 10)
         # self.add_task(JustWiggle(), 10)
         # self.add_task(BallChase(), 10)
+        self.add_task(test.DribbleTest(), 1)
+        # self.add_task(test.SitStill(), 0.1)
+        self.add_task(test.InterceptRollingBall())
 
     def draw_task_graph(self):
         if Match.time > self.last_score_time + self.score_interval:
@@ -532,6 +543,12 @@ class MaruChamp(TaskAgent):
             y += dy
         y += dy
         self.draw_task_graph()
+        # my_line = Line(Match.agent_car.position, Match.agent_car.forward)
+        # opp_line = Line(Match.opponent_car.position, Match.opponent_car.forward)
+        # draw.line(my_line, "yellow")
+        # draw.line(opp_line, "cyan")
+        # draw.point(my_line.intersection(opp_line) + Vec3(z=20), 10, "white")
+        Match.ball.is_rolling()
 
     def every_tick(self):
         self.tick_start = perf_counter_ns()
@@ -539,7 +556,9 @@ class MaruChamp(TaskAgent):
         if len(self.tasks) == 1:
             self.setup_tasks()
         super().every_tick()
-        self.debug()
+        # self.debug()
+        # Match.draw_prediction()
+        # draw.cross(Match.current_prediction.next_bounce())
         tick_ms = (perf_counter_ns() - self.tick_start) / 1e6
         self.stat_tick_ms.update(tick_ms)
 

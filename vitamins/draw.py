@@ -124,44 +124,32 @@ def cross(loc: Vec3, length: int = 15, thickness: int = 3, color: str = ""):
     renderer.draw_rect_3d(loc, length, thickness, True, col, True)
 
 
-def text(x: int, y: int, size: int = 1, text: str = "", color: str = ""):
+def text(x: int, y: int, size: int = 1, text_str: str = "", color: str = ""):
     """Draw a string in 2D space (i.e. to a position on the screen, not in the world.)
-
-    :param x,y: Where on screen to draw the text
-    :param size: Font size (1=normal, 2=double, etc.)
-    :param text: Text to draw
-    :param color: Color name
-    :return: None
     """
-    renderer.draw_string_2d(x, y, size, size, text, get_color(color))
+    renderer.draw_string_2d(x, y, size, size, text_str, get_color(color))
 
 
-def text_3d(location, size: int = 1, text: str = "", color: str = ""):
+def text_3d(location, size: int = 1, text_str: str = "", color: str = ""):
     """Draw a string in 3D space.
-
-    :param location: Where in world space to draw the text
-    :param size: Font size (1=normal, 2=double, etc.)
-    :param text: Text to draw
-    :param color: Color name
-    :return: None
     """
-    renderer.draw_string_3d(location, size, size, text, get_color(color))
+    renderer.draw_string_3d(location, size, size, text_str, get_color(color))
 
 
-def line(line: Line, color: str = "", bump_color: str = ""):
+def line(this_line: Line, color: str = "", bump_color: str = ""):
     if bump_color == "":
         bump_color = color
-    bumps = 5
+    bumps = 0
     bump_spd = 5000
     length = 20000
-    bump_period = length / (bumps * bump_spd)
     height = Vec3(z=20)
-    start = line.base_point - line.direction * length / 2 + height
-    end = line.base_point + line.direction * length / 2 + height
+    start = height + this_line.base_point - this_line.direction * length / 2
+    end = height + this_line.base_point + this_line.direction * length / 2
     line_3d(start, end, color)
     for i in range(bumps):
+        bump_period = length / (bumps * bump_spd)
         t = (i + (time.time() / bump_period) % 1) * length / bumps
-        point(start + t * line.direction, size=7, color=bump_color)
+        point(start + t * this_line.direction, size=7, color=bump_color)
 
 
 def path(points, line_color="", point_color=""):

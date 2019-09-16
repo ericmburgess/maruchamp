@@ -9,6 +9,8 @@ from vitamins.match.match import Match
 
 
 BOOST_ACCEL = 991.557
+COAST_ACCEL = -525.0
+BRAKE_ACCEL = -3500.0
 BOOST_USAGE_PER_SEC = 33.3
 MAX_CAR_SPEED = 2300.0
 forward_accel_curve = Lerp(
@@ -45,6 +47,8 @@ def simulate_drive_forward(
         if speed < MAX_CAR_SPEED and boost > 0:
             boost = max(0, boost - BOOST_USAGE_PER_SEC * dt)
             accel = forward_accel_curve(speed) + BOOST_ACCEL
+        elif throttle < 0.01 and boost == 0:
+            accel = COAST_ACCEL
         else:
             accel = forward_accel_curve(speed) * throttle
         moved += (speed + accel * dt * accel_lerp) * dt
@@ -94,6 +98,40 @@ class Path:
         for i in range(start_index + 1, end_index):
             distance += self.waypoints[i - 1].dist(self.waypoints[i])
         return distance
+
+
+def maintain_forward_speed(desired_speed: float, boost_available: float = 0) -> bool:
+    """Apply throttle, boost, and/or brakes as needed to reach and maintain the given
+    forward speed. Return True while working on it, False if it becomes impossible.
+    """
+    car = Match.agent_car
+    desired_speed = min(desired_speed, MAX_CAR_SPEED)
+    dt = 0.30  # We'll set controls to reach desired speed in `dt` seconds if possible
+    desired_accel = (desired_speed - car.forward_speed) / dt
+    full_throttle_accel = forward_accel_curve(car.forward_speed)
+    boost_needed = (desired_speed - MAX_CAR_SPEED) * BOOST_USAGE_PER_SEC / BOOST_ACCEL
+    if boost_needed > boost_available:
+        return False
+    accel_threshold = 10.0
+    Match.agent.boost(False)
+    if desired_accel < 0 and car.forward_speed > desired_speed:
+        Match.agent.throttle(-1)
+    elif desired_accel < BRAKE_ACCEL * 0.6:
+        Match.agent.throttle(-1)
+    elif desired_accel < -accel_threshold:
+        Match.agent.throttle(0)
+    elif desired_accel < accel_threshold:
+        Match.agent.throttle(0.02)
+    elif desired_accel <= full_throttle_accel:
+        Match.agent.throttle(desired_accel / full_throttle_accel)
+    else:
+        if car.forward_speed == MAX_CAR_SPEED:
+            Match.agent.boost(True)
+        elif boost_available > boost_needed + BOOST_USAGE_PER_SEC * dt:
+            Match.agent.boost(True)
+        else:
+            Match.agent.throttle(1)
+            Match.agent.boost(False)
 
 
 def steer_to(target: Location, no_handbrake=False):
